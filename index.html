@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>A* Pathfinding</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: Arial, sans-serif; background: #fff; padding: 16px; }
+  h2 { font-size: 18px; margin-bottom: 10px; }
+
+  .leyenda { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 8px; font-size: 12px; align-items: center; }
+  .ley { display: flex; align-items: center; gap: 4px; }
+  .ley span { width: 16px; height: 16px; display: inline-block; border: 1px solid #aaa; border-radius: 2px; }
+
+  .herramientas { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 8px; }
+  .herramientas button { padding: 5px 12px; font-size: 12px; border: 2px solid #ccc; background: #fff; color: #333; border-radius: 4px; cursor: pointer; }
+  .herramientas button.active { border-color: #1a73e8; background: #e8f0fe; color: #1a73e8; }
+
+  .controles { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-bottom: 10px; padding: 8px; background: #f5f5f5; border-radius: 6px; }
+  .controles label { font-size: 13px; }
+  .controles input, .controles select { padding: 5px 7px; font-size: 13px; border: 1px solid #ccc; border-radius: 4px; }
+  .controles input { width: 70px; }
+
+  button.run  { padding: 7px 16px; font-size: 13px; font-weight: bold; border: none; border-radius: 4px; cursor: pointer; background: #1a73e8; color: #fff; }
+  button.cmp  { padding: 7px 16px; font-size: 13px; font-weight: bold; border: none; border-radius: 4px; cursor: pointer; background: #34a853; color: #fff; }
+  button.grey { padding: 7px 16px; font-size: 13px; font-weight: bold; border: none; border-radius: 4px; cursor: pointer; background: #e0e0e0; color: #333; }
+
+  #grid-canvas { cursor: crosshair; border: 1px solid #aaa; display: block; margin-bottom: 8px; }
+
+  .info { font-size: 12px; color: #666; margin-bottom: 6px; }
+
+  .resultados { display: flex; gap: 16px; flex-wrap: wrap; margin-top: 8px; font-size: 13px; }
+  .stat { background: #f5f5f5; padding: 8px 16px; border-radius: 6px; text-align: center; min-width: 80px; }
+  .stat b { display: block; font-size: 22px; color: #1a73e8; }
+
+  .comparativa { margin-top: 14px; }
+  .comparativa h3 { font-size: 13px; margin-bottom: 6px; color: #555; }
+  table { border-collapse: collapse; font-size: 13px; width: 100%; max-width: 600px; }
+  th { background: #1a73e8; color: white; padding: 7px 12px; text-align: center; }
+  td { padding: 6px 12px; text-align: center; border-bottom: 1px solid #eee; }
+  tr.astar-row td { background: #e8f5e9; }
+
+  #log { font-size: 12px; color: #555; margin-top: 8px; font-family: monospace; }
+  #log .ok  { color: green; }
+  #log .err { color: red; }
+  #log .info { color: #1a73e8; }
+
+  .spinner { display:none; font-size:12px; color:#1a73e8; margin-left:8px; }
+</style>
+</head>
+<body>
+
+<h2>🚗 A* Pathfinding — Navegacion Autonoma</h2>
+
+<div class="leyenda">
+  <div class="ley"><span style="background:#c8e6c9"></span> Calle (coste 1)</div>
+  <div class="ley"><span style="background:#424242"></span> Bloqueado</div>
+  <div class="ley"><span style="background:#fff9c4"></span> Lento (coste 3)</div>
+  <div class="ley"><span style="background:#ff8c00"></span> Autovia (coste 0.5)</div>
+  <div class="ley"><span style="background:#bbdefb"></span> Explorado</div>
+  <div class="ley"><span style="background:#ffa726"></span> Ruta optima</div>
+</div>
+
+<div class="herramientas">
+  <button class="active" data-tool="0" onclick="setTool(this)">Calle</button>
+  <button data-tool="1" onclick="setTool(this)">Bloquear</button>
+  <button data-tool="2" onclick="setTool(this)">Lento</button>
+  <button data-tool="3" onclick="setTool(this)">Autovia</button>
+  <button data-tool="S" onclick="setTool(this)">Origen</button>
+  <button data-tool="E" onclick="setTool(this)">Destino</button>
+  <button class="grey" onclick="preset()">Mapa ciudad</button>
+  <button class="grey" onclick="limpiar()">Limpiar</button>
+</div>
+
+<div class="controles">
+  <label>Filas <input type="number" id="rows" value="12" min="5" max="25"></label>
+  <label>Cols  <input type="number" id="cols" value="12" min="5" max="25"></label>
+  <button class="grey" onclick="initGrid()">Aplicar tamano</button>
+  &nbsp;
+  <label>Origen  <input type="text" id="ini" value="0,0"></label>
+  <label>Destino <input type="text" id="fin" value="11,11"></label>
+  &nbsp;
+  <select id="algo">
+    <option value="astar">A* (Euclidea)</option>
+    <option value="astar_m">A* (Manhattan)</option>
+    <option value="dijkstra">Dijkstra</option>
+    <option value="bfs">BFS</option>
+  </select>
+  <button class="run" onclick="ejecutar()">Ejecutar</button>
+  <button class="cmp" onclick="comparar()">Comparar todos</button>
+  <span class="spinner" id="spinner">Calculando...</span>
+</div>
+
+<canvas id="grid-canvas"></canvas>
+<div class="info" id="info">Haz clic en las celdas para editarlas. Clic derecho borra.</div>
+
+<div class="resultados">
+  <div class="stat"><b id="s-pasos">-</b>Pasos</div>
+  <div class="stat"><b id="s-coste" style="color:#e67e22">-</b>Coste</div>
+  <div class="stat"><b id="s-exp"   style="color:#34a853">-</b>Explorados</div>
+  <div class="stat"><b id="s-ms"    style="color:#8e44ad">-</b>Tiempo</div>
+</div>
+
+<div class="comparativa" id="cmp-section" style="display:none">
+  <h3>Comparativa A* vs Dijkstra vs BFS</h3>
+  <table id="cmp-table">
+    <tr><th>Algoritmo</th><th>Pasos</th><th>Coste</th><th>Nodos explorados</th><th>Tiempo (ms)</th></tr>
+  </table>
+</div>
+
+<div id="log"></div>
+
+<script>
+const LIBRE=0, BLOQ=1, LENTO=2, RAPIDO=3;
+const COL={0:'#c8e6c9', 1:'#424242', 2:'#fff9c4', 3:'#ff8c00'};
+const BOR={0:'#a5d6a7', 1:'#212121', 2:'#f9a825', 3:'#e65100'};
+
+let ROWS=12, COLS=12, cs=42;
+let grid, ini=[0,0], fin=[11,11];
+let camino=[], visitados=[], tool='0', drag=false;
+const cv = document.getElementById('grid-canvas');
+const ctx = cv.getContext('2d');
+
+function initGrid() {
+  ROWS = Math.min(25, Math.max(5, +document.getElementById('rows').value || 12));
+  COLS = Math.min(25, Math.max(5, +document.getElementById('cols').value || 12));
+  grid = Array.from({length:ROWS}, () => new Array(COLS).fill(LIBRE));
+  ini  = [0, 0]; fin = [ROWS-1, COLS-1];
+  document.getElementById('ini').value = '0,0';
+  document.getElementById('fin').value = `${ROWS-1},${COLS-1}`;
+  camino=[]; visitados=[];
+  cs = Math.max(22, Math.min(58, Math.floor(Math.min((window.innerWidth-80)/COLS, 520/ROWS))));
+  cv.width  = COLS * cs;
+  cv.height = ROWS * cs;
+  render();
+}
+
+function limpiar() {
+  grid = Array.from({length:ROWS}, () => new Array(COLS).fill(LIBRE));
+  camino=[]; visitados=[]; render();
+}
+
+function preset() {
+  initGrid();
+  [[1,2],[1,3],[2,2],[3,5],[3,6],[4,5],[5,1],[5,2],[6,8],[6,9],[7,8],
+   [8,3],[8,4],[9,3],[10,6],[10,7],[7,1],[7,2]].forEach(([r,c])=>{if(r<ROWS&&c<COLS)grid[r][c]=BLOQ;});
+  [[4,3],[5,3],[9,8]].forEach(([r,c])=>{if(r<ROWS&&c<COLS)grid[r][c]=LENTO;});
+  [[0,5],[0,6],[1,5],[1,6],[6,0],[7,0],[8,0],[9,0],[10,0],[11,5],[11,6]].forEach(([r,c])=>{if(r<ROWS&&c<COLS)grid[r][c]=RAPIDO;});
+  render(); addLog('ok', 'Mapa ciudad cargado.');
+}
+
+function setTool(btn) {
+  document.querySelectorAll('.herramientas button').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  tool = btn.dataset.tool;
+}
+
+function cellAt(e) {
+  const rect = cv.getBoundingClientRect();
+  const c = Math.floor((e.clientX - rect.left) / cs);
+  const r = Math.floor((e.clientY - rect.top)  / cs);
+  if (r>=0 && r<ROWS && c>=0 && c<COLS) return [r, c];
+  return null;
+}
+
+function paint(r, c) {
+  if (tool === 'S') { ini=[r,c]; document.getElementById('ini').value=`${r},${c}`; }
+  else if (tool === 'E') { fin=[r,c]; document.getElementById('fin').value=`${r},${c}`; }
+  else grid[r][c] = parseInt(tool);
+  camino=[]; visitados=[]; render();
+}
+
+cv.addEventListener('mousedown', e => { drag=true; const p=cellAt(e); if(p){if(e.button===2){grid[p[0]][p[1]]=LIBRE;render();}else paint(...p);} });
+cv.addEventListener('mousemove', e => {
+  if (!drag) return;
+  const p = cellAt(e);
+  if (p) { if(e.buttons===2){grid[p[0]][p[1]]=LIBRE;render();}else if(tool!=='S'&&tool!=='E')paint(...p); }
+  if (p) { const t=['Calle','Bloqueado','Lento','Autovia']; document.getElementById('info').textContent=`[${p[0]},${p[1]}] ${t[grid[p[0]][p[1]]]} — coste ${({0:1,1:'inf',2:3,3:0.5})[grid[p[0]][p[1]]]}`; }
+});
+cv.addEventListener('mouseup',    () => drag = false);
+cv.addEventListener('mouseleave', () => drag = false);
+cv.addEventListener('contextmenu', e => e.preventDefault());
+
+function onPath(r, c) { return camino.some(([a,b]) => a===r && b===c); }
+function onVisit(r, c){ return visitados.some(([a,b]) => a===r && b===c); }
+
+function render() {
+  ctx.clearRect(0, 0, cv.width, cv.height);
+  for (let r=0; r<ROWS; r++) for (let c=0; c<COLS; c++) {
+    const x=c*cs, y=r*cs, t=grid[r][c];
+    let color = COL[t];
+    if (onVisit(r,c) && !onPath(r,c)) color = '#bbdefb';
+    if (onPath(r,c))                  color = '#ffa726';
+    ctx.fillStyle = color; ctx.fillRect(x, y, cs, cs);
+    ctx.strokeStyle = BOR[t]; ctx.lineWidth = 0.7;
+    ctx.strokeRect(x+0.35, y+0.35, cs-0.7, cs-0.7);
+    if (cs >= 32) {
+      ctx.fillStyle='rgba(0,0,0,.22)'; ctx.font=`${Math.floor(cs*.16)}px Arial`;
+      ctx.textAlign='left'; ctx.textBaseline='top';
+      ctx.fillText(`${r},${c}`, x+2, y+2);
+    }
+  }
+  if (camino.length > 1) {
+    ctx.beginPath();
+    ctx.moveTo(camino[0][1]*cs+cs/2, camino[0][0]*cs+cs/2);
+    for (let i=1; i<camino.length; i++) ctx.lineTo(camino[i][1]*cs+cs/2, camino[i][0]*cs+cs/2);
+    ctx.strokeStyle='#e67e22'; ctx.lineWidth=3; ctx.stroke();
+  }
+  mark(ini, '#2ecc71', '🚗');
+  mark(fin, '#e74c3c', '🏁');
+}
+
+function mark([r,c], col, emoji) {
+  const x=c*cs, y=r*cs;
+  ctx.fillStyle = col+'44'; ctx.fillRect(x,y,cs,cs);
+  ctx.strokeStyle = col; ctx.lineWidth=2.5; ctx.strokeRect(x+1,y+1,cs-2,cs-2);
+  if (cs>=26) { ctx.font=`${Math.floor(cs*.55)}px sans-serif`; ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.fillText(emoji, x+cs/2, y+cs/2+1); }
+}
+
+function parsePos(id) {
+  const p = document.getElementById(id).value.split(',').map(x=>+x.trim());
+  if (p.length===2 && p[0]>=0 && p[0]<ROWS && p[1]>=0 && p[1]<COLS) return p;
+  return null;
+}
+
+function setStats(d) {
+  document.getElementById('s-pasos').textContent = d.pasos || '-';
+  document.getElementById('s-coste').textContent = d.coste != null ? d.coste : '-';
+  document.getElementById('s-exp').textContent   = d.explorados || '-';
+  document.getElementById('s-ms').textContent    = d.tiempo_ms != null ? d.tiempo_ms+'ms' : '-';
+}
+
+async function ejecutar() {
+  const s=parsePos('ini'), e=parsePos('fin');
+  if (!s||!e) { addLog('err','Posicion invalida.'); return; }
+  if (grid[s[0]][s[1]]===BLOQ || grid[e[0]][e[1]]===BLOQ) { addLog('err','Origen o destino bloqueado.'); return; }
+  ini=s; fin=e;
+  spinner(true);
+  const res = await fetch('/buscar', {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({ grid, inicio:s, fin:e, algoritmo: document.getElementById('algo').value })
+  }).then(r=>r.json());
+  spinner(false);
+  camino    = res.camino;
+  visitados = res.visitados;
+  render(); setStats(res);
+  const algo = document.getElementById('algo').value;
+  const nombres = {astar:'A* Eucl.',astar_m:'A* Manh.',dijkstra:'Dijkstra',bfs:'BFS'};
+  if (res.pasos > 0) addLog('ok', `[${nombres[algo]}] ${res.pasos} pasos | coste ${res.coste} | explorados ${res.explorados} | ${res.tiempo_ms}ms`);
+  else addLog('err', 'No existe ruta posible.');
+}
+
+async function comparar() {
+  const s=parsePos('ini'), e=parsePos('fin');
+  if (!s||!e) { addLog('err','Posicion invalida.'); return; }
+  ini=s; fin=e;
+  spinner(true);
+  const res = await fetch('/comparar', {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({ grid, inicio:s, fin:e })
+  }).then(r=>r.json());
+  spinner(false);
+
+  camino    = res.astar.camino;
+  visitados = res.astar.visitados;
+  render(); setStats(res.astar);
+
+  // Tabla comparativa
+  const sec   = document.getElementById('cmp-section');
+  const tabla = document.getElementById('cmp-table');
+  tabla.innerHTML = '<tr><th>Algoritmo</th><th>Pasos</th><th>Coste</th><th>Nodos explorados</th><th>Tiempo (ms)</th></tr>';
+  const nombres = {astar:'A*', dijkstra:'Dijkstra', bfs:'BFS'};
+  for (const [key, d] of Object.entries(res)) {
+    const tr = document.createElement('tr');
+    if (key==='astar') tr.className='astar-row';
+    tr.innerHTML = `<td>${nombres[key]}</td><td>${d.pasos}</td><td>${d.coste}</td><td>${d.explorados}</td><td>${d.tiempo_ms}</td>`;
+    tabla.appendChild(tr);
+    addLog('ok', `${nombres[key]}: ${d.pasos} pasos | coste ${d.coste} | explorados ${d.explorados} | ${d.tiempo_ms}ms`);
+  }
+  sec.style.display = 'block';
+}
+
+function spinner(on) {
+  document.getElementById('spinner').style.display = on ? 'inline' : 'none';
+}
+
+function addLog(type, msg) {
+  const el = document.getElementById('log');
+  const d  = document.createElement('div');
+  d.className = type;
+  d.textContent = ({ok:'+ ',err:'x ',info:'> '}[type]||'') + msg;
+  el.appendChild(d);
+  while (el.children.length > 20) el.removeChild(el.firstChild);
+}
+
+window.onload = () => { initGrid(); preset(); };
+</script>
+</body>
+</html>
